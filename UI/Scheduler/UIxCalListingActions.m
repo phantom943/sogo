@@ -1060,8 +1060,8 @@ static inline void _feedBlockWithDayBasedData (NSMutableDictionary *block, unsig
 
   if (dayBasedView)
     _feedBlockWithDayBasedData (block, start, end, dayStart);
-  // else
-  //   _feedBlockWithMonthBasedData (block, start, userTimeZone, dateFormatter);
+  else
+    _feedBlockWithMonthBasedData (block, start, userTimeZone, dateFormatter);
   [block setObject: number forKey: @"nbr"];
   if (recurrenceTime)
     [block setObject: [NSNumber numberWithInt: recurrenceTime]
@@ -1076,6 +1076,7 @@ static inline void _feedBlockWithDayBasedData (NSMutableDictionary *block, unsig
 - (void) _fillBlocks: (NSArray *) blocks
            withEvent: (NSArray *) event
           withNumber: (NSNumber *) number
+     andDisplaySetting: (BOOL) displayAsSingleBox
 {
   int offset, recurrenceTime;
   long long startSecs, endsSecs, swap, currentDayStart, currentStart, eventStart,
@@ -1132,19 +1133,22 @@ static inline void _feedBlockWithDayBasedData (NSMutableDictionary *block, unsig
       return;
 
     userState = _userStateInEvent(event);
-    while (currentDayStart + dayLength < eventEnd)
+    if (displayAsSingleBox)
     {
-      eventBlock = [self _eventBlockWithStart: currentStart
-                                          end: currentDayStart + dayLength - 1
-                                        number: number
-                                        onDay: currentDayStart
-                                recurrenceTime: recurrenceTime
-                                    userState: userState];
-      [currentDay addObject: eventBlock];
-      currentDayStart += dayLength;
-      currentStart = currentDayStart;
-      offset++;
-      currentDay = [blocks objectAtIndex: offset];
+        while (currentDayStart + dayLength < eventEnd)
+        {
+          eventBlock = [self _eventBlockWithStart: currentStart
+                                              end: currentDayStart + dayLength - 1
+                                            number: number
+                                            onDay: currentDayStart
+                                    recurrenceTime: recurrenceTime
+                                        userState: userState];
+          [currentDay addObject: eventBlock];
+          currentDayStart += dayLength;
+          currentStart = currentDayStart;
+          offset++;
+          currentDay = [blocks objectAtIndex: offset];
+        }
     }
 
     computedEventEnd = eventEnd;
@@ -1460,10 +1464,14 @@ _computeBlocksPosition (NSArray *blocks)
   NSMutableArray *allDayBlocks, *blocks, *days, *currentDay, *eventsForCalendar, *eventsByCalendars;
   NSNumber *eventNbr;
   NSString *calendarName, *calendarId;
-  BOOL isAllDay;
+  BOOL isAllDay, displayAsSingleBox;
   int i, j;
+  SOGoUserDefaults *userDefaults;
 
   [self _setupContext];
+
+  userDefaults = [[self context] activeUser].userDefaults;
+  displayAsSingleBox = [userDefaults boolForKey: @"SOGoCalendarDisplayMultiDayEventsAsSingleBox"];
 
   events = [self _fetchFields: eventsFields forComponentOfType: @"vevent"];
 
@@ -1500,9 +1508,9 @@ _computeBlocksPosition (NSArray *blocks)
         eventNbr = [NSNumber numberWithUnsignedInt: count];
         isAllDay = [[event objectAtIndex: eventIsAllDayIndex] boolValue];
         if (dayBasedView && isAllDay)
-          [self _fillBlocks: allDayBlocks withEvent: event withNumber: eventNbr];
+          [self _fillBlocks: allDayBlocks withEvent: event withNumber: eventNbr andDisplaySetting: displayAsSingleBox];
         else
-          [self _fillBlocks: blocks withEvent: event withNumber: eventNbr];
+          [self _fillBlocks: blocks withEvent: event withNumber: eventNbr andDisplaySetting: displayAsSingleBox];
       }
 
       currentDate = [[startDate copy] autorelease];
@@ -1545,9 +1553,9 @@ _computeBlocksPosition (NSArray *blocks)
       eventNbr = [NSNumber numberWithUnsignedInt: count];
       isAllDay = [[event objectAtIndex: eventIsAllDayIndex] boolValue];
       if (dayBasedView && isAllDay)
-        [self _fillBlocks: allDayBlocks withEvent: event withNumber: eventNbr];
+        [self _fillBlocks: allDayBlocks withEvent: event withNumber: eventNbr andDisplaySetting: displayAsSingleBox];
       else
-        [self _fillBlocks: blocks withEvent: event withNumber: eventNbr];
+        [self _fillBlocks: blocks withEvent: event withNumber: eventNbr andDisplaySetting: displayAsSingleBox];
     }
 
     currentDate = [[startDate copy] autorelease];
